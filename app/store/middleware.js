@@ -14,7 +14,7 @@ import {
 export function messageRetention(store) {
     return (next) => (action) => {
         if (action.type === 'BATCHING_REDUCER.BATCH') {
-            console.log('MM-DEBUG Action', action.payload.map((a) => a.type)); // eslint-disable-line no-console
+            console.log('MM-DEBUG Action', action.payload.map((a) => a.type).join(',')); // eslint-disable-line no-console
         } else {
             console.log('MM-DEBUG Action', action.type); // eslint-disable-line no-console
         }
