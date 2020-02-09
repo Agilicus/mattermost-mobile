@@ -1,0 +1,66 @@
+
+#cache:
+#  key: ${CI_COMMIT_REF_SLUG}
+#  paths:
+#    - ~/.npm
+#    - ~/.bundle
+#    - ~/.cache
+#    - ~/.android
+#    - ~/.gradle
+#    - ~/.gem
+#    - node_modules
+
+stages:
+  - build
+
+before_script:
+  - echo "$PLAY_SERVICE_ACCOUNT" > /tmp/sa.json
+  - echo BRANCH_TO_BUILD=${CI_COMMIT_BRANCH} > fastlane/.env
+  - echo GIT_LOCAL_BRANCH=${CI_COMMIT_BRANCH} >> fastlane/.env
+  - echo APP_NAME=\"MISA Chat\" >> fastlane/.env
+  - echo APP_SCHEME=agilicus >> fastlane/.env
+  - echo COMMIT_CHANGES_TO_GIT=false >> fastlane/.env
+  - echo RESET_GIT_BRANCH=false >> fastlane/.env
+  - echo LC_ALL="en_US.UTF-8" >> fastlane/.env
+  - echo NODE_OPTIONS=--max_old_space_size=12000 >> fastlane/.env
+  - echo SUPPLY_TRACK=Beta >> fastlane/.env
+  - echo SUPPLY_PACKAGE_NAME=com.agilicus.rnbeta >> fastlane/.env
+  - echo SUPPLY_JSON_KEY=/tmp/sa.json >> fastlane/.env
+  - echo SUPPLY_VALIDATE_ONLY=false >> fastlane/.env
+  - echo BETA_BUILD=true >> fastlane/.env
+  - echo BUILD_FOR_RELEASE=true >> fastlane/.env
+  - echo REPLACE_ASSETS=true >> fastlane/.env
+  - echo MAIN_APP_IDENTIFIER=com.agilicus.rnbeta >> fastlane/.env
+  - echo EXTENSION_APP_IDENTIFIER=com.agilicus.rnbeta.MattermostShare >> fastlane/.env
+  - echo NOTIFICATION_SERVICE_IDENTIFIER=com.agilicus.rnbeta.NotificationService >> fastlane/.env
+  - echo SUBMIT_ANDROID_TO_GOOGLE_PLAY=true >> fastlane/.env
+  - echo "$KEYSTORE" |base64 -d > android/keystore
+  - echo "" | tee -a android/gradle.properties
+  - echo MATTERMOST_RELEASE_STORE_FILE=keystore | tee -a android/gradle.properties
+  - echo MATTERMOST_RELEASE_PASSWORD=$KEYSTORE_ALIAS_PASS | tee -a android/gradle.properties
+  - echo MATTERMOST_RELEASE_KEY_ALIAS=$KEYSTORE_ALIAS | tee -a android/gradle.properties
+
+
+android:
+  stage: build
+  image: circleci/android:api-27-node
+  artifacts:
+    paths:
+      - "*.apk"
+  script: |
+    echo "ruby-2.6.3" > ~/.ruby-version
+    (cd fastlane && bundle install --path vendor/bundle)
+    NODE_ENV=development npm install --ignore-scripts
+    (cd node_modules/mattermost-redux && npm i)
+    make dist/assets
+    (cd android && ./gradlew dependencies)
+    make post-install
+    make build-android build-unsigned
+    find . -maxdepth 2 -name "*.apk"
+    echo "Push apk to Google play"
+    (cd fastlane && bundle exec fastlane supply --apk ../MISA_Chat.apk --track beta)
+    echo "Complete"
+    killall -r java || true
+    killall -r node || true
+    #(cd fastlane && bundle exec fastlane android build)
+    #(cd fastlane && bundle exec fastlane android beta)
